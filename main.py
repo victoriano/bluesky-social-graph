@@ -88,6 +88,9 @@ else:
     relationships = get_all_followings(client, my_did, limit=N)
     relationship_type = 'Following'
 
+# Set the output filename based on the relationship type
+output_filename = f"{relationship_type.lower()}_connections.csv"
+
 # Map follower DIDs to their handles
 follower_did_to_handle = {follower.did: follower.handle for follower in relationships}
 
@@ -110,7 +113,7 @@ def get_followings(client, did):
     return followings
 
 # Open the CSV file and write data
-with open('connections.csv', 'w', newline='', encoding='utf-8') as csvfile:
+with open(output_filename, 'w', newline='', encoding='utf-8') as csvfile:
     # Write the header manually
     csvfile.write('Relationship Type,Username,Mutual Connections\n')
     
@@ -145,4 +148,4 @@ with open('connections.csv', 'w', newline='', encoding='utf-8') as csvfile:
         # Flush data to disk after each write
         csvfile.flush()
 
-print("Connections have been saved to 'connections.csv'.")
+print(f"Connections have been saved to '{output_filename}'.")

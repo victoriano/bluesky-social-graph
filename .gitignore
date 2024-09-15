@@ -78,3 +78,5 @@ cover/
 connections.csv
 follower_connections.csv
 follower_connections.json
+following_connections.csv
+following_connections.json
