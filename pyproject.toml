@@ -1,17 +1,23 @@
 [tool.poetry]
-name = "bsky-social-graph"
+name = "bluesky-social-graph"
 version = "0.1.0"
-description = ""
+description = "A tool to retrieve and analyze Bluesky follower/following relationships"
 authors = ["Victoriano Izquierdo <victoriano@gmail.com>"]
-package-mode = false 
-
+license = "MIT"
+readme = "README.md"
+packages = [{include = "bluesky_social_graph", from = "src"}]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
+python = ">=3.8,<3.12"
 atproto = "^0.0.54"
-python-dotenv = "^1.0.1"
+python-dotenv = "^0.19.0"
 
+[tool.poetry.dev-dependencies]
+pytest = "^6.2"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+bluesky-social-graph = "bluesky_social_graph.main:main"
