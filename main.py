@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import os
 import argparse
+import csv
 from atproto import Client
 
 # Load the .env file
@@ -114,8 +115,9 @@ def get_followings(client, did):
 
 # Open the CSV file and write data
 with open(output_filename, 'w', newline='', encoding='utf-8') as csvfile:
-    # Write the header manually
-    csvfile.write('Relationship Type,Username,Mutual Connections\n')
+    writer = csv.writer(csvfile, quoting=csv.QUOTE_ALL)
+    # Write the header
+    writer.writerow(['Relationship Type', 'Username', 'Mutual Connections'])
     
     for person in relationships:
         # Print progress for each username
@@ -133,17 +135,14 @@ with open(output_filename, 'w', newline='', encoding='utf-8') as csvfile:
         # Convert the set to a sorted list for consistency
         mutual_connections_list = sorted(list(mutual_connections))
 
-        # Enclose each username in double quotes
-        mutual_connections_list_with_quotes = [f'"{username}"' for username in mutual_connections_list]
+        # Enclose each username in single double quotes
+        mutual_connections_list_with_quotes = ['"{}"'.format(username) for username in mutual_connections_list]
 
         # Format mutual connections with commas inside brackets
-        mutual_connections_str = '[' + ', '.join(mutual_connections_list_with_quotes) + ']'
+        mutual_connections_str = '[' + ','.join(mutual_connections_list_with_quotes) + ']'
 
-        # Build the CSV line
-        line = f"{relationship_type},{person.handle},{mutual_connections_str}\n"
-
-        # Write the line to the CSV file
-        csvfile.write(line)
+        # Write the row using csv.writer
+        writer.writerow([relationship_type, person.handle, mutual_connections_str])
 
         # Flush data to disk after each write
         csvfile.flush()
