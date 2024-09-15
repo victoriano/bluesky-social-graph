@@ -1,7 +1,6 @@
 from dotenv import load_dotenv
 import os
 import argparse
-import csv
 from atproto import Client
 
 # Load the .env file
@@ -14,12 +13,23 @@ PASSWORD = os.environ.get('BLUESKY_PASSWORD')
 if not USERNAME or not PASSWORD:
     raise ValueError("BLUESKY_USERNAME and BLUESKY_PASSWORD must be set in the .env file or as environment variables")
 
-# Parse command-line arguments
-parser = argparse.ArgumentParser(description='Retrieve follower connections.')
-parser.add_argument('-n', '--number', type=int, help='Limit the number of followers to process')
+# Set up argument parsing
+parser = argparse.ArgumentParser(description='Retrieve follower or following relationships.')
+parser.add_argument(
+    '-n', '--number',
+    type=int,
+    default=10,
+    help='Number of users to retrieve (default: 10)'
+)
+parser.add_argument(
+    '-r', '--relationship',
+    choices=['followers', 'following'],
+    default='following',
+    help='Type of relationship to retrieve (followers or following)'
+)
 args = parser.parse_args()
 
-N = args.number  # N will be None if not specified
+N = args.number  # N will be 10 if not specified
 
 # Initialize the client and log in
 client = Client()
@@ -30,39 +40,58 @@ params = {'actor': USERNAME}
 profile = client.app.bsky.actor.get_profile(params=params)
 my_did = profile.did  # Accessing the 'did' attribute
 
-# Retrieve your followers
+# Function to get all followers up to a limit
 def get_all_followers(client, did, limit=None):
     followers = []
     cursor = None
 
     while True:
         response = client.app.bsky.graph.get_followers(params={'actor': did, 'cursor': cursor})
-
-        # Access the 'followers' list from the response
         followers.extend(response.followers)
 
-        # If a limit is set and we've reached it, truncate the list and break
+        # If a limit is set and reached, truncate and break
         if limit is not None and len(followers) >= limit:
             followers = followers[:limit]
             break
 
-        # Access the 'cursor' attribute from the response
         cursor = response.cursor
-
         if not cursor:
             break
 
     return followers
 
-followers = get_all_followers(client, my_did, limit=N)
+# Function to get all followings up to a limit
+def get_all_followings(client, did, limit=None):
+    followings = []
+    cursor = None
+
+    while True:
+        response = client.app.bsky.graph.get_follows(params={'actor': did, 'cursor': cursor})
+        followings.extend(response.follows)
+
+        # If a limit is set and reached, truncate and break
+        if limit is not None and len(followings) >= limit:
+            followings = followings[:limit]
+            break
+
+        cursor = response.cursor
+        if not cursor:
+            break
+
+    return followings
+
+# Retrieve relationships based on the specified type
+if args.relationship == 'followers':
+    relationships = get_all_followers(client, my_did, limit=N)
+    relationship_type = 'Follower'
+else:
+    relationships = get_all_followings(client, my_did, limit=N)
+    relationship_type = 'Following'
 
 # Map follower DIDs to their handles
-follower_did_to_handle = {follower.did: follower.handle for follower in followers}
+follower_did_to_handle = {follower.did: follower.handle for follower in relationships}
 
-# Initialize a dictionary to store connections
-follower_connections = {}
-
-# Function to get followings of a follower
+# Function to get followings of a user (used later to find mutual connections)
 def get_followings(client, did):
     followings = []
     cursor = None
@@ -70,13 +99,8 @@ def get_followings(client, did):
     while True:
         try:
             response = client.app.bsky.graph.get_follows(params={'actor': did, 'cursor': cursor})
-
-            # Access the 'follows' list from the response
             followings.extend(response.follows)
-
-            # Access the 'cursor' attribute from the response
             cursor = response.cursor
-
             if not cursor:
                 break
         except Exception as e:
@@ -85,32 +109,40 @@ def get_followings(client, did):
 
     return followings
 
-# Open the CSV file before the loop
-with open('follower_connections.csv', 'w', encoding='utf-8') as file:
-    # Write the header
-    file.write('Follower,Mutual Connections\n')
+# Open the CSV file and write data
+with open('connections.csv', 'w', newline='', encoding='utf-8') as csvfile:
+    # Write the header manually
+    csvfile.write('Relationship Type,Username,Mutual Connections\n')
+    
+    for person in relationships:
+        # Print progress for each username
+        print(f"Processing username: {person.handle}")
 
-    # Retrieve followings for each follower and find mutual connections
-    for follower in followers:
-        follower_did = follower.did
-        follower_handle = follower.handle
-        print(f"Processing follower: {follower_handle}")
+        # Get the followings of the person
+        person_followings = get_followings(client, person.did)
 
-        followings = get_followings(client, follower_did)
-        following_dids = {following.did for following in followings}
+        # Find mutual connections
+        mutual_connections = set()
+        for following in person_followings:
+            if following.did in follower_did_to_handle:
+                mutual_connections.add(follower_did_to_handle[following.did])
 
-        # Find mutual followers
-        mutual_followers = following_dids & set(follower_did_to_handle.keys())
-        mutual_handles = [follower_did_to_handle[did] for did in mutual_followers]
+        # Convert the set to a sorted list for consistency
+        mutual_connections_list = sorted(list(mutual_connections))
 
-        follower_connections[follower_handle] = mutual_handles
+        # Enclose each username in double quotes
+        mutual_connections_list_with_quotes = [f'"{username}"' for username in mutual_connections_list]
 
-        # Write the current follower's connections to the CSV file
-        connections_str = '[' + ', '.join(f'"{c}"' for c in mutual_handles) + ']'
-        line = f'{follower_handle},{connections_str}\n'
-        file.write(line)
-        
-        # Flush the file buffer to ensure data is written to disk
-        file.flush()
+        # Format mutual connections with commas inside brackets
+        mutual_connections_str = '[' + ', '.join(mutual_connections_list_with_quotes) + ']'
 
-print("Follower connections have been saved to 'follower_connections.csv'.")
+        # Build the CSV line
+        line = f"{relationship_type},{person.handle},{mutual_connections_str}\n"
+
+        # Write the line to the CSV file
+        csvfile.write(line)
+
+        # Flush data to disk after each write
+        csvfile.flush()
+
+print("Connections have been saved to 'connections.csv'.")

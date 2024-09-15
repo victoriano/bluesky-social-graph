@@ -75,5 +75,6 @@ cover/
 *.local
 
 # Output files
+connections.csv
 follower_connections.csv
 follower_connections.json
