@@ -85,29 +85,32 @@ def get_followings(client, did):
 
     return followings
 
-# Retrieve followings for each follower and find mutual connections
-for follower in followers:
-    follower_did = follower.did
-    follower_handle = follower.handle
-    print(f"Processing follower: {follower_handle}")
-
-    followings = get_followings(client, follower_did)
-    following_dids = {following.did for following in followings}
-
-    # Find mutual followers
-    mutual_followers = following_dids & set(follower_did_to_handle.keys())
-    mutual_handles = [follower_did_to_handle[did] for did in mutual_followers]
-
-    follower_connections[follower_handle] = mutual_handles
-
-# Save the connections to a CSV file manually
+# Open the CSV file before the loop
 with open('follower_connections.csv', 'w', encoding='utf-8') as file:
     # Write the header
     file.write('Follower,Mutual Connections\n')
-    for follower, connections in follower_connections.items():
-        # Format connections as per required format
-        connections_str = '[' + ', '.join(f'"{c}"' for c in connections) + ']'
-        line = f'{follower},{connections_str}\n'
+
+    # Retrieve followings for each follower and find mutual connections
+    for follower in followers:
+        follower_did = follower.did
+        follower_handle = follower.handle
+        print(f"Processing follower: {follower_handle}")
+
+        followings = get_followings(client, follower_did)
+        following_dids = {following.did for following in followings}
+
+        # Find mutual followers
+        mutual_followers = following_dids & set(follower_did_to_handle.keys())
+        mutual_handles = [follower_did_to_handle[did] for did in mutual_followers]
+
+        follower_connections[follower_handle] = mutual_handles
+
+        # Write the current follower's connections to the CSV file
+        connections_str = '[' + ', '.join(f'"{c}"' for c in mutual_handles) + ']'
+        line = f'{follower_handle},{connections_str}\n'
         file.write(line)
+        
+        # Flush the file buffer to ensure data is written to disk
+        file.flush()
 
 print("Follower connections have been saved to 'follower_connections.csv'.")
